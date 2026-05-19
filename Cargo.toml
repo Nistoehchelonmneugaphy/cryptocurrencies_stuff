@@ -1,0 +1,13 @@
+[package]
+name = "cryptocurrencies_stuff"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bip39 = "2.2.2"
+bip32 = "0.5.3"
+secp256k1 = { version = "0.31.1", features = ["rand"] }
+sha2 = "0.11"
+ripemd = "0.2"
+bech32 = "0.11.1"
+rand = "0.10.1"
