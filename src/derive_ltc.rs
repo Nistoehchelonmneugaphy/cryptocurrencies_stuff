@@ -1,45 +1,10 @@
-use bip39::Mnemonic;
-use bip32::ChildNumber;
-use sha2::{Sha256, Digest};
-use ripemd::Ripemd160;
 use bech32::{self, Hrp};
+use bip32::ChildNumber;
+use bip39::Mnemonic;
+use ripemd::Ripemd160;
+use sha2::{Digest, Sha256};
 use std::str::FromStr;
 
-
-pub fn test_ltc() {
-    let mnemonic = "stairs grace visit maple author pattern pumpkin erosion chimney learn quick cabin";
-
-    let max = 10;
-    let mut index = 0;
-    loop {
-        let Ok(addr) = derive_ltc_bip84_address(mnemonic, index) else {
-            assert_eq!(1, 2);
-            break;
-        };
-        println!("{index} {addr}");
-        index += 1;
-        if index > max {
-            break;
-        }
-    }
-
-    let max = 10;
-    let mut index = 0;
-    loop {
-        let addr = match derive_ltc_bip84_address(mnemonic, 0) {
-            Ok(a) => a,
-            Err(e) => {
-                println!("{e}");
-                continue;
-            }
-        };
-        println!("{index} {addr}");
-        index += 1;
-        if index > max {
-            break;
-        }
-    }
-}
 
 /// Derives a BIP84 (native SegWit / P2WPKH) Litecoin address.
 ///
@@ -53,23 +18,22 @@ pub fn test_ltc() {
 /// The resulting address uses the "ltc" bech32 HRP (Litecoin mainnet).
 pub fn derive_ltc_bip84_address(master_seed: &str, index: u64) -> Result<String, String> {
     // 1. Parse mnemonic and derive BIP39 seed (no passphrase)
-    let mnemonic = Mnemonic::from_str(master_seed)
-        .map_err(|e| format!("Invalid mnemonic: {e}"))?;
+    let mnemonic = Mnemonic::from_str(master_seed).map_err(|e| format!("Invalid mnemonic: {e}"))?;
     let seed = mnemonic.to_seed("");
 
     // 2. Build the master extended private key from the 64-byte seed
-    let master = bip32::XPrv::new(&seed)
-        .map_err(|e| format!("Master key derivation failed: {e}"))?;
+    let master =
+        bip32::XPrv::new(&seed).map_err(|e| format!("Master key derivation failed: {e}"))?;
 
     // 3. Derive m/84'/2'/0'/0/{index} step by step
     let child = master
-        .derive_child(ChildNumber::new(84, true) .unwrap()) // 84'  purpose
+        .derive_child(ChildNumber::new(84, true).unwrap()) // 84'  purpose
         .map_err(|e| format!("Derive 84' failed: {e}"))?
-        .derive_child(ChildNumber::new(2,  true) .unwrap()) // 2'   coin (LTC)
+        .derive_child(ChildNumber::new(2, true).unwrap()) // 2'   coin (LTC)
         .map_err(|e| format!("Derive 2' failed: {e}"))?
-        .derive_child(ChildNumber::new(0,  true) .unwrap()) // 0'   account
+        .derive_child(ChildNumber::new(0, true).unwrap()) // 0'   account
         .map_err(|e| format!("Derive 0' failed: {e}"))?
-        .derive_child(ChildNumber::new(0,  false).unwrap()) // 0    external chain
+        .derive_child(ChildNumber::new(0, false).unwrap()) // 0    external chain
         .map_err(|e| format!("Derive 0 failed: {e}"))?
         .derive_child(ChildNumber::new(index as u32, false).unwrap()) // index
         .map_err(|e| format!("Derive index {index} failed: {e}"))?;
@@ -77,7 +41,7 @@ pub fn derive_ltc_bip84_address(master_seed: &str, index: u64) -> Result<String,
     // 4. Compressed public key (33 bytes)
     let pubkey_bytes = child.public_key().to_bytes();
 
- // 5. Hash160 = RIPEMD160(SHA256(pubkey))
+    // 5. Hash160 = RIPEMD160(SHA256(pubkey))
     let sha256 = Sha256::digest(&pubkey_bytes);
     let hash160 = Ripemd160::digest(&sha256);
 
@@ -85,6 +49,5 @@ pub fn derive_ltc_bip84_address(master_seed: &str, index: u64) -> Result<String,
     // bech32 v0.11: encode takes an Hrp and raw witness program bytes;
     // use encode_v0 (segwit v0) which handles the witness version + base32 internally.
     let hrp = Hrp::parse("ltc").map_err(|e| format!("Invalid HRP: {e}"))?;
-    bech32::segwit::encode_v0(hrp, &hash160)
-        .map_err(|e| format!("bech32 encode failed: {e}"))
+    bech32::segwit::encode_v0(hrp, &hash160).map_err(|e| format!("bech32 encode failed: {e}"))
 }
